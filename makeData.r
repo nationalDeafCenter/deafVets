@@ -1,101 +1,55 @@
 library(readr) ## read in the csvs faster
 library(dplyr)
 library(openxlsx)
-states <- read.csv('../../../data/states.csv')
+source('generalCode/estimationFunctions.r')
+states <- read.csv('../../data/states.csv')
 
 #1) a simple breakdown of current enrollment, and completion data, across type of institution (4 year colleges, community colleges, etc) using all the 'type of institution' data we have, so that would give us some nice descriptives and allow us to make a final decision on how we want to categorize 'community colleges and 2-year institutions'
 
 
 
 
-varNames <- c('ST','AGEP','DDRS','DEAR','DEYE','DOUT','DPHY','DRATX','DREM','FDEARP','ESR','SCHL','RAC1P','HISP','SEX','PERNP','PINCP','SSIP','WKHP','WKW','ADJINC','PWGTP','RELP','FOD1P','NAICSP',paste0('PWGTP',1:80))
+varNames <- c('ST','AGEP','DDRS','DEAR','DEYE','DOUT','DPHY','DRATX','DREM','FDEARP','ESR','SCHL','RAC1P','HISP','SEX','PERNP','PINCP','SSIP','WKHP','WKW','ADJINC','PWGTP','RELP','DRAT','MIL',
+              paste0('MLP',c('A','B','CD','E','FG',LETTERS[8:11])),
+              paste0('pwgtp',1:80))
 
-firstTry <- read_csv(paste0('../../../data/byYear/ss17pusa.csv'), n_max=5)
-colTypes <- ifelse(names(firstTry)%in%varNames,'i','-')
-missingVars <- setdiff(varNames,names(firstTry)[colTypes=='i'])
+firstTry <- read_csv(paste0('../../data/acs5yr2016/ss16pusa.csv'), n_max=5)
+colTypes <- ifelse(tolower(names(firstTry))%in%tolower(varNames),'i','-')
+missingVars <- setdiff(tolower(varNames),tolower(names(firstTry)[colTypes=='i']))
 if(length(missingVars)) cat('WARNING: Missing these variables:\n',missingVars,'\n')
 
 colTypes <- paste(colTypes,collapse='')
 
 
-datA <- read_csv('../../../data/byYear/ss17pusa.csv',col_types=colTypes)
-datB <- read_csv('../../../data/byYear/ss17pusb.csv',col_types=colTypes)
-## need: DEAR, attain, employment,PERNP, fulltime
-dat <- rbind(datA[,varNames],datB[,varNames])
+datA <- read_csv('../../data/acs5yr2016/ss16pusa.csv',col_types=colTypes)
+datB <- read_csv('../../data/acs5yr2016/ss16pusb.csv',col_types=colTypes)
+datC <- read_csv('../../data/acs5yr2016/ss16pusc.csv',col_types=colTypes)
+datD <- read_csv('../../data/acs5yr2016/ss16pusd.csv',col_types=colTypes)
 
-rm(datA,datB); gc()
+stopifnot(all.equal(names(datA),names(datB)))
+stopifnot(all.equal(names(datA),names(datC)))
+stopifnot(all.equal(names(datA),names(datD)))
 
-#### from mark bond's code
-dat$degree <- ifelse(dat$FOD1P < 1200, "Agriculture", NA)
-dat$degree <- ifelse(dat$FOD1P > 1300 & dat$FOD1P < 1400, "Environmental Science", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 1400 & dat$FOD1P < 1500, "Architecture", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 1500 & dat$FOD1P < 1600, "Ethnic studies", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 1900 & dat$FOD1P < 2000, "Journalism, Communications, PR", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2000 & dat$FOD1P < 2100, "Communication Technologies", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2099 & dat$FOD1P < 2200, "Computer Science", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2200 & dat$FOD1P < 2300, "Cosmetology/Culinary Arts", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2299 & dat$FOD1P < 2400, "Education", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2399 & dat$FOD1P < 2600, "Engineering", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2599 & dat$FOD1P < 2700, "Foreign Language", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 2900 & dat$FOD1P < 3000, "Family and Consumer Sciences", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3200 & dat$FOD1P < 3300, "Pre-Law and Court Reporting", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3400 & dat$FOD1P < 3500, "Liberal Arts", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3499 & dat$FOD1P < 3600, "Library Science", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3599 & dat$FOD1P < 3700, "Biology", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3699 & dat$FOD1P < 3800, "Mathematics", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 3800 & dat$FOD1P < 3900, "Military Technologies", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 4000 & dat$FOD1P < 4100, "Interdisciplinary studies", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 4100 & dat$FOD1P < 4200, "Physical fitness, parks, recreation", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 4800 & dat$FOD1P < 4900, "Philosophy", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 4900 & dat$FOD1P < 5000, "Theology", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5000 & dat$FOD1P < 5200, "Physial Sciences", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5199 & dat$FOD1P < 5300, "Psychology", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5300 & dat$FOD1P < 5400, "Criminal Justice", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5400 & dat$FOD1P < 5500, "Public Policy, social work", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5499 & dat$FOD1P < 5600, "Social Sciences", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5600 & dat$FOD1P < 5700, "Construction Services", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5700 & dat$FOD1P < 5800, "Electrical, Mechanical, and Precision Technologies, Production", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5900 & dat$FOD1P < 6000, "Transportation science", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 5999 & dat$FOD1P < 6100, "Fine Arts", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 6099 & dat$FOD1P < 6200, "Medical/Health Services", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 6199 & dat$FOD1P < 6300, "Business", dat$degree)
-dat$degree <- ifelse(dat$FOD1P > 6400, "History", dat$degree)
-dat$degree <- factor(dat$degree)
 
-dat$industryCode <- NA
-dat$x <- substring(dat$NAICSP, first = 1, last=2)
-dat$industryCode <- ifelse(dat$x == "11", "Agriculture", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "21", "Extraction", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "22", "Utilities", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "23", "Construction", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "31", "Manufacturing", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "32", "Manufacturing", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "33", "Manufacturing", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "3M", "Manufacturing", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "42", "Wholesale", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "44", "Retail", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "45", "Retail", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "4M", "Retail", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "48", "Transportation", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "49", "Transportation", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "51", "Information services", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "52", "Finance", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "53", "Finance", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "54", "Professional services", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "55", "Professional services", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "56", "Professional services", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "61", "Education", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "62", "Medical", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "71", "Entertainment", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "72", "Entertainment", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "81", "Service", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "92", "GOV/MIL/ADM", dat$industryCode)
-dat$industryCode <- ifelse(dat$x == "99", "Unemployed", dat$industryCode)
+dat <- rbind(datA,datB,datC,datD)
+
+rm(datA,datB,datC,datD); gc()
 
 
 names(dat) <- tolower(names(dat))
 
 dat$state <- states$abb[match(dat$st,states$x)]
+gc()
+### let's figure out what the definition of "veteran" is
+### https://www.census.gov/acs/www/about/why-we-ask-each-question/veterans/ says 8%
+### https://factfinder.census.gov/faces/tableservices/jsf/pages/productview.xhtml?src=bkmk "civilian veterans" 8.0%
+## factorProps('mil',dat,cum=FALSE)
+##     % 1            1 SE             % 2            2 SE             % 3
+## 0.403647        0.002822        7.963292        0.009436        1.291155
+##     3 SE             % 4            4 SE               n
+## 0.004261       90.341905        0.011969 12364760.000000
+## well, it looks like mil==2 does it.
+##  from data dictionary (MIL):   2    .On active duty in the past, but not now
 
 
 edlevs <- c(
@@ -116,7 +70,7 @@ edlevs <- c(
 dat$attain <- ifelse(dat$schl<13,1,dat$schl-11)
 dat$attain <- factor(edlevs[dat$attain],levels=edlevs,ordered=TRUE)
 
-
+gc()
 
 dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionalized
     mutate(
@@ -140,6 +94,11 @@ dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionaliz
         employment=factor(ifelse(esr%in%c(1,2,4,5),'Employed',
                    ifelse(esr==3,'Unemployed','Not In Labor Force'))),
 
+        currentMil=factor(ifelse(esr%in%4:5,'Currently serving','Not currently serving')),
+        vet=factor(ifelse(mil==2,'vet','not vet')), ## not counting reserves, nat.guard. see above
+        recentVet=(vet=='vet')&!is.na(mlpa)&(mlpa==1), ## since 9/11 not currently active duty (except reservs,ng?)
+
+
         fulltime=(employment=='Employed')&(wkw==1 & wkhp>=35),
 
         raceEth=ifelse(hisp>1,"Hispanic",
@@ -152,7 +111,8 @@ dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionaliz
         blind=ifelse(deye==1,'blind','seeing'),
 
         sex=ifelse(sex==1,'Male','Female'))
+gc()
 
 
-
-save(dat,file='attainmentEmploymentData.RData')
+save(dat,file='vetData.RData')
+gc()
