@@ -9,7 +9,7 @@ states <- read.csv('../../data/states.csv')
 
 
 
-varNames <- c('ST','AGEP','DDRS','DEAR','DEYE','DOUT','DPHY','DRATX','DREM','FDEARP','ESR','SCHL','RAC1P','HISP','SEX','PERNP','PINCP','SSIP','WKHP','WKW','ADJINC','PWGTP','RELP','DRAT','MIL',
+varNames <- c('ST','AGEP','DDRS','DEAR','DEYE','DOUT','DPHY','DRATX','DREM','FDEARP','ESR','SCHL','SCH','SCHG','RAC1P','HISP','SEX','PERNP','PINCP','SSIP','WKHP','WKW','ADJINC','PWGTP','RELP','DRAT','MIL',
               paste0('MLP',c('A','B','CD','E','FG',LETTERS[8:11])),
               paste0('pwgtp',1:80))
 
@@ -72,7 +72,7 @@ dat$attain <- factor(edlevs[dat$attain],levels=edlevs,ordered=TRUE)
 
 gc()
 
-dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionalized
+dat <- dat%>%filter(agep>17,agep<55,relp!=16)%>% ## relp==16 for institutionalized
     mutate(
         selfCare=factor(ifelse(ddrs==1,'Self-Care Difficulty','No Self-Care Difficulty')),
         indLiv=factor(ifelse(dout==1,'Independent Living Difficulty','No Independent Living Difficulty')),
@@ -81,16 +81,36 @@ dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionaliz
                        ifelse(dratx==1,'Vet. Service Connected Disability','No Service Connected Disability'))),
         cogDif=factor(ifelse(drem==1,'Cognitive Difficulty','No Cognitive Difficulty')),
         deaf=factor(ifelse(dear==1,'deaf','hearing')),
-        Age=ordered(ifelse(agep<35,'25-34',
+        Age=ordered(
+          ifelse(agep<25,'18-24',
+          ifelse(agep<35,'25-34',
             ifelse(agep<45,'35-44',
-            ifelse(agep<55,'45-54','55-64')))),
+            ifelse(agep<55,'45-54','55-64'))))),
         attainCum=ordered(
             ifelse(attain<'Regular high school diploma','No HS',
             ifelse(attain<'Some college, but less than 1 year','HS Diploma',
             ifelse(attain<'Associates degree','Some College',
             ifelse(attain<'Bachelors degree','Associates',
             ifelse(attain<'Masters degree','Bachelors','Post-Graduate'))))),
-           levels=c('No HS','HS Diploma','Some College','Associates','Bachelors','Post-Graduate')),
+            levels=c('No HS','HS Diploma','Some College','Associates','Bachelors','Post-Graduate')),
+
+        postSec= ordered(
+          ifelse(attain<'Regular high school diploma','No HS',
+            ifelse(attain<'Some college, but less than 1 year','HS Diploma',as.character(attain))),
+          levels=c('No HS','HS Diploma','Some college, but less than 1 year',
+            '1 or more years of college credit, no degree',
+            'Associates degree',
+            'Bachelors degree',
+            'Masters degree',
+            'Professional degree beyond a bachelors degree',
+            'Doctorate degree')),
+
+        enrollment=ifelse(sch==1,'not enrolled',
+          ifelse(schg<15,'k-12',
+            ifelse(schg==15,'undergrad','grad school'))),
+
+        enrolled=ifelse(sch==1,'not enrolled','enrolled'),
+
         employment=factor(ifelse(esr%in%c(1,2,4,5),'Employed',
                    ifelse(esr==3,'Unemployed','Not In Labor Force'))),
 
@@ -107,12 +127,21 @@ dat <- dat%>%filter(agep>24,agep<65,relp!=16)%>% ## relp==16 for institutionaliz
                 ifelse(rac1p%in%c(3,4,5),'American Indian',
                 ifelse(rac1p==1,"White","Other"))))),
 
-        diss=ifelse(ddrs==1|deye==1|dout==1|dphy==1|(!is.na(dratx)&dratx==1)|drem==1,'disabled','nondisabled'),
+        diss=ifelse(ddrs==1|deye==1|dout==1|dphy==1|drem==1,'disabled','nondisabled'),
         blind=ifelse(deye==1,'blind','seeing'),
 
         sex=ifelse(sex==1,'Male','Female'))
 gc()
 
+dat$postSecEnrolled <-
+  ifelse(dat$enrolled=='enrolled',
+    paste(as.character(dat$postSec),'Enr'),
+    as.character(dat$postSec))
+
+psEnrlevs <- NULL
+for(l in levels(dat$postSec)) psEnrlevs <- c(psEnrlevs,l,paste(l,'Enr'))
+
+dat$postSecEnrolled <- ordered(dat$postSecEnrolled,levels=psEnrlevs)
 
 save(dat,file='vetData.RData')
 gc()
