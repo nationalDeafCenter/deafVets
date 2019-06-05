@@ -23,6 +23,21 @@ rates <- dat%>%group_by(deaf)%>%
     percent=sapply(levels(dat$postSec),function(x) svmean(.x$postSec>=x,.x$pwgtp))))%>%
   spread(deaf,percent)
 
+
+## enrollment proportions
+enrModD <- glm(enrolled~ns(agep,5),family=binomial,data=filter(dat,deaf=='deaf'),weights=pwgtp)
+enrModH <- glm(enrolled~ns(agep,5),family=binomial,data=filter(dat,deaf=='hearing'),weights=pwgtp)
+pd <- data.frame(agep=seq(25,55))
+pdD <- pd%>%mutate(pred=predict(enrModD,pd,type='response'),deaf='deaf')
+pdH <- pd%>%mutate(pred=predict(enrModH,pd,type='response'),deaf='hearing')
+pd <- rbind(pdD,pdH)
+ggplot(pd,aes(agep,pred,group=deaf,color=deaf))+geom_line()+xlab('Proportion Enrolled')+ylab('Age')
+
+enrProp <- dat%>%group_by(deaf,agep)%>%summarize(propEnr=svmean(enrolled,pwgtp))
+
+ggplot(full_join(enrProp,pd),aes(agep,propEnr,color=deaf,group=deaf))+geom_point()+geom_line(aes(y=pred))+ylab('Proportion Enrolled')+xlab('Age')
+ggsave('enrolledProportionByAge.jpg')
+
 ## transform data
 ldat <- transformData(dat)
 
@@ -107,3 +122,18 @@ modFullRecent <-  model(event~level*deaf+female+ns(ageCentered,df=5)*deaf+raceEt
 save(modFullRecent,file='fullModRecent.RData')
 plotInt(modFullRecent)+ggtitle('Post-9/11 Vets')
 ggsave('recent.pdf',width=10,height=6)
+
+### what about when drat=1 (ie 0%)
+ldat0 <- transformData(filter(dat,(deaf=='hearing')|(drat==1)))
+ldat0$female <- ldat0$sex=='Female'
+ldat0$raceEth <- relevel(factor(ldat0$raceEth),ref='White')
+ldat0$ageCentered <- ldat0$agep-35
+modFull0 <- model(event~level*deaf+female+ns(ageCentered,df=5)*deaf+raceEth+nativity,data=ldat0,surveySEs=FALSE)
+save(modFull0,file='fullMod0.RData')
+plotInt(modFull0,ldat=ldat0)+ggtitle('0% Disability Rating')
+ggsave('full0.pdf',width=10,height=6)
+plotInt(modFull0,ldat=ldat0,reverse=TRUE)+ggtitle('0% Disability Rating')
+ggsave('fullReverse0.pdf',width=10,height=6)
+
+hazardOddsRatios(modFull0,ldat0,age=35)+ggtitle('0% Disability Rating')
+ggsave('oddRatiosFull350.pdf')
