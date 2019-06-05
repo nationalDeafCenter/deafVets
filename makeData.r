@@ -1,3 +1,11 @@
+
+## for suvival model: (nothing in stone here)
+## exclude disabled
+## include only dratx=1
+## use drat as cont covariate (?)
+## compare deaf nondisabled dratx=1 to hearing nondisabled dratx=0 vets
+## period of service: pre/post 911
+
 library(readr) ## read in the csvs faster
 library(dplyr)
 library(openxlsx)
