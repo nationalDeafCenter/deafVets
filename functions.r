@@ -18,6 +18,11 @@ inf <- function(enr,diss=TRUE,ages=agerange,years='2012-16',n=NULL){
 
 
 reformatAll <- function(lll,enr,diss=TRUE, ages=agerange,years='2012-16',n=NULL){
+
+  lll <- sapply(lll, function(ll)
+    as.data.frame(sapply(ll,function(l) if(is.factor(l)) as.character(l) else l,
+      simplify=FALSE)))
+
   if('byDiss'%in%names(lll)){
     discol <- which(sapply(lll$byDiss,function(x) any(x=='disabled')))
     lll$byDiss <- lll$byDiss[!lll$byDiss[,discol]%in% c(

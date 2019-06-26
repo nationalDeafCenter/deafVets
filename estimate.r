@@ -11,8 +11,10 @@ library(broom)
 
 source('../generalCode/estimationFunctions.r')
 source('../generalCode/median.r')
+source('functions.r')
 
-agerange <- paste(min(dat$agep),'-',max(dat$agep))
+
+agerange <- paste0(min(dat$agep),'-',max(dat$agep))
 totaln <- nrow(dat)
 
 
@@ -36,6 +38,20 @@ postSecEnr <- standard('postSecEnrolled',factorProps,dat)
 employment <- standard('employment',empFun,dat,
                        byAttainment=bysub(1,empFun,dat,attainCum)
                        )
+
+employment <- sapply( employment,
+  function(emp){
+  for(j in which(names(emp)=='')){
+    if('deaf'%in%emp[,j]){
+      names(emp)[j] <- 'deaf'
+    } else if('vet'%in%emp[,j]){
+      names(emp)[j] <- 'vet'
+    } else names(emp)[j] <- 'subgroup'
+  }
+  emp
+  },simplify=FALSE)
+
+do.call('bind_rows',employment)%>%dplyr::select(deaf,vet,subgroup,everything())
 
 inLaborForce <- lapply(employment,
                        function(x) setNames(data.frame(x[,colnames(x)==''],
@@ -122,64 +138,96 @@ popBreakdown[1:4] <- lapply(popBreakdown[1:4],t)
 inLaborForce$info <- rbind(info,'Calculated from employment numbers')
 
 
-
-
-openxlsx::write.xlsx(inLaborForce,'LaborForceParticipation2012-16VETS.xlsx',colWidths='auto')
-openxlsx::write.xlsx(reformatAll(attainment,enr=TRUE),'EducatonalAttainment2012-16VETS.xlsx',colWidths='auto')
-openxlsx::write.xlsx(reformatAll(attainmentNotEnrolled,enr=FALSE),'EducatonalAttainment2012-16VETSnotEnrolled.xlsx',colWidths='auto')
-openxlsx::write.xlsx(reformatAll(postSecNotEnrolled,enr=FALSE),'postSecAttainment2012-16VETSnotEnrolled.xlsx',colWidths='auto')
-openxlsx::write.xlsx(reformatAll(postSecEnr,enr=TRUE),'EducatonalAttainment2012-16VETSwEnrollment.xlsx',colWidths='auto')
-openxlsx::write.xlsx(employment,'employment2012-16VETS.xlsx',colWidths='auto')
-openxlsx::write.xlsx(medianEarnings,'medianEarnings2012-16VETS.xlsx',colWidths='auto')
-openxlsx::write.xlsx(popBreakdown,'populationBreakdown2012-16VETS.xlsx',rowNames=TRUE,colWidths='auto')
+dis <- sum(dat$diss=='disabled')>0
 
 
 
+openxlsx::write.xlsx(
+  list(
+    attainment=reformatAll(attainment,enr=TRUE,diss=dis,ages=agerange,n=totaln),
+    employment=employment
+  ),
+  file=paste0(
+    'ages',
+    agerange,
+    '/attainmentEmployment',
+    ifelse(dis,'Total','Nondisabled'),
+    '.xlsx'
+  )
+)
+
+openxlsx::write.xlsx(
+  popBreakdown,
+  paste0(
+    'ages',
+    agerange,
+    '/populationBreakdown',
+    ifelse(dis,'Total','Nondisabled'),
+    '.xlsx'),
+  rowNames=TRUE,colWidths='auto')
 
 
-library(ggplot2)
-
-## employment by age
-empByAge <- FIX(dat%>%group_by(deaf,vet,agep)%>%do(x=estExpr(employment=="Employed",sdat=.)))
-names(empByAge)[1:3] <- c('deaf','vet','Age')
-
-ggplot(empByAge,aes(Age,est,color=deaf,linetype=vet))+geom_smooth()+labs(color=NULL,y='% Employed')
-ggsave('employmentByAge.jpg')
-
-## earnings by age
-ernByAge <- FIX(dat%>%filter(fulltime)%>%group_by(deaf,vet,agep)%>%do(x=med(~pernp,sdat=.)))
-names(ernByAge) <- c('deaf','vet','Age','ern','se','n')
-
-ggplot(ernByAge,aes(Age,ern,color=deaf,linetype=vet))+geom_smooth()+labs(color=NULL,y='Median Earnings (Full-Time Employed)')
-ggsave('earningsByAge.jpg')
-
-baByAge <- FIX(dat%>%group_by(deaf,vet,agep)%>%do(x=estExpr(attainCum>='Bachelors',sdat=.)))
-names(baByAge)[1:3] <- c('deaf','vet','Age')
-ggplot(baByAge,aes(Age,est,color=deaf,linetype=vet))+geom_smooth()+ylab('% At Least BA')
-ggsave('bachelorsByAge.jpg')
-
-### age distribution of deaf & hearing vets
-ageDistDeafVet <- factorProps('agep',filter(dat,deaf=='deaf',vet=='vet'),cum=FALSE)
-ageDistHearVet <- factorProps('agep',filter(dat,deaf=='hearing',vet=='vet'),cum=FALSE)
-ageDistDeafRecent <- factorProps('agep',filter(dat,deaf=='deaf',recentVet),cum=FALSE)
-ageDistHearRecent <- factorProps('agep',filter(dat,deaf=='hearing',recentVet),cum=FALSE)
-
-vetAge <- data.frame(age=rep(25:64,2),deaf=rep(c('deaf','hearing'),each=40),
-                     prob=c(ageDistDeafVet[paste('%', 25:64)], ageDistHearVet[paste('%',25:64)]))
-
-ggplot(vetAge,aes(age,prob))+geom_col()+facet_grid(deaf~.)+ggtitle('Distribution of Ages for Hearing & Deaf Veterans')
-ggsave('vetAgeDist.jpg')
-
-recentAge <- data.frame(age=rep(25:64,2),deaf=rep(c('deaf','hearing'),each=40),
-                     prob=c(ageDistDeafRecent[paste('%', 25:64)], ageDistHearRecent[paste('%',25:64)]))
-
-ggplot(recentAge,aes(age,prob))+geom_col()+facet_grid(deaf~.)+ggtitle('Distribution of Ages for Hearing & Deaf Veterans who Served 9/2001 or Later')
-ggsave('recentVetAgeDist.jpg')
+ ##  #inLaborForce,'LaborForceParticipation2012-16VETS.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(reformatAll(attainment,enr=TRUE),'EducatonalAttainment2012-16VETS.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(reformatAll(attainmentNotEnrolled,enr=FALSE),'EducatonalAttainment2012-16VETSnotEnrolled.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(reformatAll(postSecNotEnrolled,enr=FALSE),'postSecAttainment2012-16VETSnotEnrolled.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(reformatAll(postSecEnr,enr=TRUE),'EducatonalAttainment2012-16VETSwEnrollment.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(employment,'employment2012-16VETS.xlsx',colWidths='auto')
+## openxlsx::write.xlsx(medianEarnings,'medianEarnings2012-16VETS.xlsx',colWidths='auto')
 
 
 
 
 
-save(list=ls()[sapply(ls(),function(x) object.size(get(x)))<1e7],file='results.RData')
+
+## library(ggplot2)
+
+## ## employment by age
+## empByAge <- FIX(dat%>%group_by(deaf,vet,agep)%>%do(x=estExpr(employment=="Employed",sdat=.)))
+## names(empByAge)[1:3] <- c('deaf','vet','Age')
+
+## ggplot(empByAge,aes(Age,est,color=deaf,linetype=vet))+geom_smooth()+labs(color=NULL,y='% Employed')
+## ggsave('employmentByAge.jpg')
+
+## ## earnings by age
+## ernByAge <- FIX(dat%>%filter(fulltime)%>%group_by(deaf,vet,agep)%>%do(x=med(~pernp,sdat=.)))
+## names(ernByAge) <- c('deaf','vet','Age','ern','se','n')
+
+## ggplot(ernByAge,aes(Age,ern,color=deaf,linetype=vet))+geom_smooth()+labs(color=NULL,y='Median Earnings (Full-Time Employed)')
+## ggsave('earningsByAge.jpg')
+
+## baByAge <- FIX(dat%>%group_by(deaf,vet,agep)%>%do(x=estExpr(attainCum>='Bachelors',sdat=.)))
+## names(baByAge)[1:3] <- c('deaf','vet','Age')
+## ggplot(baByAge,aes(Age,est,color=deaf,linetype=vet))+geom_smooth()+ylab('% At Least BA')
+## ggsave('bachelorsByAge.jpg')
+
+## ### age distribution of deaf & hearing vets
+## ageDistDeafVet <- factorProps('agep',filter(dat,deaf=='deaf',vet=='vet'),cum=FALSE)
+## ageDistHearVet <- factorProps('agep',filter(dat,deaf=='hearing',vet=='vet'),cum=FALSE)
+## ageDistDeafRecent <- factorProps('agep',filter(dat,deaf=='deaf',recentVet),cum=FALSE)
+## ageDistHearRecent <- factorProps('agep',filter(dat,deaf=='hearing',recentVet),cum=FALSE)
+
+## vetAge <- data.frame(age=rep(25:64,2),deaf=rep(c('deaf','hearing'),each=40),
+##                      prob=c(ageDistDeafVet[paste('%', 25:64)], ageDistHearVet[paste('%',25:64)]))
+
+## ggplot(vetAge,aes(age,prob))+geom_col()+facet_grid(deaf~.)+ggtitle('Distribution of Ages for Hearing & Deaf Veterans')
+## ggsave('vetAgeDist.jpg')
+
+## recentAge <- data.frame(age=rep(25:64,2),deaf=rep(c('deaf','hearing'),each=40),
+##                      prob=c(ageDistDeafRecent[paste('%', 25:64)], ageDistHearRecent[paste('%',25:64)]))
+
+## ggplot(recentAge,aes(age,prob))+geom_col()+facet_grid(deaf~.)+ggtitle('Distribution of Ages for Hearing & Deaf Veterans who Served 9/2001 or Later')
+## ggsave('recentVetAgeDist.jpg')
+
+
+
+
+
+save(list=ls()[sapply(ls(),function(x) object.size(get(x)))<1e7],file= paste0(
+    'ages',
+    agerange,
+    '/results',
+    ifelse(dis,'Total','Nondisabled'),
+    '.RData'))
 
 
